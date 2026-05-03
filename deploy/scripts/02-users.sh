@@ -1,0 +1,34 @@
+#!/usr/bin/env bash
+
+set -euo pipefail
+
+DEFAULT_PASSWORD="12345678"
+
+upsert_human() {
+    local name="$1"
+    local extra_groups="$2"
+    if id -u "$name" >/dev/null 2>&1; then
+        echo "    -> user $name already exists"
+    else
+        if [[ -n "$extra_groups" ]]; then
+            useradd --create-home --shell /bin/bash --groups "$extra_groups" "$name"
+        else
+            useradd --create-home --shell /bin/bash "$name"
+        fi
+        echo "$name:$DEFAULT_PASSWORD" | chpasswd
+        chage -d 0 "$name"
+        echo "    -> created $name (default password: $DEFAULT_PASSWORD, must change on first login)"
+    fi
+}
+
+upsert_human student sudo
+upsert_human teacher sudo
+
+upsert_human operator ""
+
+if id -u app >/dev/null 2>&1; then
+    echo "    -> user app already exists"
+else
+    useradd --system --no-create-home --shell /usr/sbin/nologin app
+    echo "    -> created system user app"
+fi
