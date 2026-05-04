@@ -1,0 +1,43 @@
+[Unit]
+Description=Simple Inventory web application (variant 14)
+After=network.target mariadb.service
+Wants=mariadb.service
+Requires=mywebapp.socket
+BindsTo=mywebapp.socket
+
+[Service]
+Type=exec
+User=app
+Group=app
+WorkingDirectory=/opt/mywebapp
+EnvironmentFile=/etc/mywebapp/env
+
+ExecStartPre=/opt/mywebapp/venv/bin/python /opt/mywebapp/migrate.py \
+    --db-host ${DB_HOST} --db-port ${DB_PORT} \
+    --db-name ${DB_NAME} --db-user ${DB_USER} \
+    --db-password ${DB_PASSWORD}
+
+ExecStart=/opt/mywebapp/venv/bin/python -m mywebapp \
+    --host ${APP_HOST} --port ${APP_PORT} \
+    --db-host ${DB_HOST} --db-port ${DB_PORT} \
+    --db-name ${DB_NAME} --db-user ${DB_USER} \
+    --db-password ${DB_PASSWORD}
+
+Restart=on-failure
+RestartSec=3s
+
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+LockPersonality=true
+MemoryDenyWriteExecute=true
+RestrictRealtime=true
+RestrictSUIDSGID=true
+
+[Install]
+WantedBy=multi-user.target

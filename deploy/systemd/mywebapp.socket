@@ -1,0 +1,13 @@
+[Unit]
+Description=mywebapp listening socket
+PartOf=mywebapp.service
+
+[Socket]
+ListenStream=127.0.0.1:5000
+NoDelay=true
+SocketUser=app
+SocketGroup=app
+SocketMode=0600
+
+[Install]
+WantedBy=sockets.target
