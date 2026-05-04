@@ -10,11 +10,14 @@ upsert_human() {
     if id -u "$name" >/dev/null 2>&1; then
         echo "    -> user $name already exists"
     else
-        if [[ -n "$extra_groups" ]]; then
-            useradd --create-home --shell /bin/bash --groups "$extra_groups" "$name"
-        else
-            useradd --create-home --shell /bin/bash "$name"
+        local useradd_args=(--create-home --shell /bin/bash)
+        if getent group "$name" >/dev/null 2>&1; then
+            useradd_args+=(--no-user-group --gid "$name")
         fi
+        if [[ -n "$extra_groups" ]]; then
+            useradd_args+=(--groups "$extra_groups")
+        fi
+        useradd "${useradd_args[@]}" "$name"
         echo "$name:$DEFAULT_PASSWORD" | chpasswd
         chage -d 0 "$name"
         echo "    -> created $name (default password: $DEFAULT_PASSWORD, must change on first login)"
