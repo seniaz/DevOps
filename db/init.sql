@@ -1,0 +1,4 @@
+CREATE DATABASE IF NOT EXISTS inventory;
+CREATE USER IF NOT EXISTS 'inventory'@'%' IDENTIFIED BY 'inventory_pass';
+GRANT ALL PRIVILEGES ON inventory.* TO 'inventory'@'%';
+FLUSH PRIVILEGES;
