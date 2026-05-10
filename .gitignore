@@ -18,3 +18,8 @@ venv/
 *.log
 *.swp
 *.bak
+
+coverage-report/
+coverage.xml
+.coverage
+htmlcov/
