@@ -1,0 +1,137 @@
+name: CD
+
+on:
+  push:
+    branches: [main]
+    tags:
+      - 'v*'
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+
+jobs:
+  build:
+    name: Build & Push Image
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          tags: |
+            type=raw,value=latest,enable=${{ github.ref == 'refs/heads/main' }}
+            type=sha,format=long,enable=${{ github.ref == 'refs/heads/main' }}
+            type=raw,value=stable,enable=${{ startsWith(github.ref, 'refs/tags/') }}
+            type=ref,event=tag
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: ./app
+          file: ./app/Dockerfile
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+
+  deploy:
+    name: Deploy to Target Node
+    runs-on: self-hosted
+    needs: [build]
+    if: startsWith(github.ref, 'refs/tags/')
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up SSH
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          ssh-keyscan -H "${{ secrets.TARGET_HOST }}" >> ~/.ssh/known_hosts 2>/dev/null
+
+      - name: Deploy application
+        env:
+          TARGET: ${{ secrets.TARGET_USER }}@${{ secrets.TARGET_HOST }}
+          KEY: ~/.ssh/deploy_key
+          IMAGE: ${{ env.REGISTRY }}/${{ github.repository }}:stable
+        run: |
+          ssh -i $KEY $TARGET << DEPLOY
+            set -euo pipefail
+
+            echo "=== Pulling new image ==="
+            sudo docker pull $IMAGE
+
+            echo "=== Stopping current container ==="
+            sudo systemctl stop mywebapp-container.service || true
+
+            echo "=== Running migration ==="
+            sudo docker run --rm --network host \
+              $IMAGE \
+              python migrate.py \
+                --db-host 127.0.0.1 --db-port 3306 \
+                --db-user mywebapp --db-password "${{ secrets.DB_PASSWORD }}" \
+                --db-name mywebapp
+
+            echo "=== Starting new container ==="
+            sudo systemctl start mywebapp-container.service
+
+            echo "=== Waiting for service ==="
+            for i in \$(seq 1 30); do
+              if curl -sf http://localhost:5000/health/alive > /dev/null 2>&1; then
+                echo "Service is alive!"
+                break
+              fi
+              echo "Waiting... (\$i/30)"
+              sleep 2
+            done
+
+            echo "=== Deploy complete ==="
+          DEPLOY
+
+      - name: Cleanup SSH
+        if: always()
+        run: rm -f ~/.ssh/deploy_key
+
+  verify:
+    name: Verify Deployment
+    runs-on: self-hosted
+    needs: [deploy]
+    if: startsWith(github.ref, 'refs/tags/')
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up SSH
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          ssh-keyscan -H "${{ secrets.TARGET_HOST }}" >> ~/.ssh/known_hosts 2>/dev/null
+
+      - name: Run verification
+        env:
+          TARGET_HOST: ${{ secrets.TARGET_HOST }}
+          TARGET_USER: ${{ secrets.TARGET_USER }}
+        run: bash scripts/verify.sh
+
+      - name: Cleanup SSH
+        if: always()
+        run: rm -f ~/.ssh/deploy_key
