@@ -61,19 +61,27 @@ jobs:
 
       - name: Set up SSH
         run: |
+          # Створюємо папку і ЖОРСТКО фіксуємо права (без цього SSH мовчки відхиляє ключі)
           mkdir -p ~/.ssh
-          cp /opt/deploy_key ~/.ssh/deploy_key
+          chmod 700 ~/.ssh
+
+          # Беремо ключ напряму з GitHub Secrets, ігноруючи файли на комп'ютері
+          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/deploy_key
           chmod 600 ~/.ssh/deploy_key
-          echo "StrictHostKeyChecking no" > ~/.ssh/config
+
+          # Прописуємо залізні правила для підключення
+          echo "Host 192.168.56.107" > ~/.ssh/config
+          echo "  StrictHostKeyChecking no" >> ~/.ssh/config
+          echo "  User ansible" >> ~/.ssh/config
+          echo "  IdentityFile ~/.ssh/deploy_key" >> ~/.ssh/config
           chmod 600 ~/.ssh/config
 
       - name: Deploy application
         env:
-          TARGET: ansible@192.168.56.107
-          KEY: ~/.ssh/deploy_key
           IMAGE: ${{ env.REGISTRY }}/${{ github.repository }}:stable
         run: |
-          ssh -i $KEY $TARGET << EOF
+          # Тепер SSH сам знає і користувача, і ключ із файлу config
+          ssh 192.168.56.107 << EOF
             set -euo pipefail
             sudo docker pull $IMAGE
             sudo systemctl stop mywebapp-container.service || true
@@ -94,7 +102,7 @@ jobs:
 
       - name: Cleanup SSH
         if: always()
-        run: rm -f ~/.ssh/deploy_key ~/.ssh/config
+        run: rm -rf ~/.ssh
 
   verify:
     name: Verify Deployment
@@ -109,9 +117,13 @@ jobs:
       - name: Set up SSH
         run: |
           mkdir -p ~/.ssh
-          cp /opt/deploy_key ~/.ssh/deploy_key
+          chmod 700 ~/.ssh
+          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/deploy_key
           chmod 600 ~/.ssh/deploy_key
-          echo "StrictHostKeyChecking no" > ~/.ssh/config
+          echo "Host 192.168.56.107" > ~/.ssh/config
+          echo "  StrictHostKeyChecking no" >> ~/.ssh/config
+          echo "  User ansible" >> ~/.ssh/config
+          echo "  IdentityFile ~/.ssh/deploy_key" >> ~/.ssh/config
           chmod 600 ~/.ssh/config
 
       - name: Run verification
@@ -122,4 +134,4 @@ jobs:
 
       - name: Cleanup SSH
         if: always()
-        run: rm -f ~/.ssh/deploy_key ~/.ssh/config
+        run: rm -rf ~/.ssh
