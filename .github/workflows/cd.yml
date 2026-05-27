@@ -62,7 +62,8 @@ jobs:
       - name: Set up SSH
         run: |
           mkdir -p ~/.ssh
-          cp /opt/deploy_key ~/.ssh/deploy_key
+          sudo cp /opt/deploy_key ~/.ssh/deploy_key
+          sudo chown $USER:$USER ~/.ssh/deploy_key
           chmod 600 ~/.ssh/deploy_key
           ssh-keyscan -H "${{ secrets.TARGET_HOST }}" >> ~/.ssh/known_hosts 2>/dev/null
 
@@ -74,13 +75,10 @@ jobs:
         run: |
           ssh -i $KEY $TARGET << DEPLOY
             set -euo pipefail
-
             echo "=== Pulling new image ==="
             sudo docker pull $IMAGE
-
             echo "=== Stopping current container ==="
             sudo systemctl stop mywebapp-container.service || true
-
             echo "=== Running migration ==="
             sudo docker run --rm --network host \
               $IMAGE \
@@ -88,10 +86,8 @@ jobs:
                 --db-host 127.0.0.1 --db-port 3306 \
                 --db-user mywebapp --db-password "${{ secrets.DB_PASSWORD }}" \
                 --db-name mywebapp
-
             echo "=== Starting new container ==="
             sudo systemctl start mywebapp-container.service
-
             echo "=== Waiting for service ==="
             for i in \$(seq 1 30); do
               if curl -sf http://localhost:5000/health/alive > /dev/null 2>&1; then
@@ -101,7 +97,6 @@ jobs:
               echo "Waiting... (\$i/30)"
               sleep 2
             done
-
             echo "=== Deploy complete ==="
           DEPLOY
 
@@ -122,7 +117,8 @@ jobs:
       - name: Set up SSH
         run: |
           mkdir -p ~/.ssh
-          cp /opt/deploy_key ~/.ssh/deploy_key
+          sudo cp /opt/deploy_key ~/.ssh/deploy_key
+          sudo chown $USER:$USER ~/.ssh/deploy_key
           chmod 600 ~/.ssh/deploy_key
           ssh-keyscan -H "${{ secrets.TARGET_HOST }}" >> ~/.ssh/known_hosts 2>/dev/null
 
