@@ -64,7 +64,8 @@ jobs:
           mkdir -p ~/.ssh
           cp /opt/deploy_key ~/.ssh/deploy_key
           chmod 600 ~/.ssh/deploy_key
-          ssh-keyscan -H "${{ secrets.TARGET_HOST }}" >> ~/.ssh/known_hosts 2>/dev/null
+          echo "StrictHostKeyChecking no" > ~/.ssh/config
+          chmod 600 ~/.ssh/config
 
       - name: Deploy application
         env:
@@ -72,7 +73,7 @@ jobs:
           KEY: ~/.ssh/deploy_key
           IMAGE: ${{ env.REGISTRY }}/${{ github.repository }}:stable
         run: |
-          ssh -i $KEY $TARGET << DEPLOY
+          ssh -i $KEY $TARGET << EOF
             set -euo pipefail
             sudo docker pull $IMAGE
             sudo systemctl stop mywebapp-container.service || true
@@ -89,11 +90,11 @@ jobs:
               fi
               sleep 2
             done
-          DEPLOY
+          EOF
 
       - name: Cleanup SSH
         if: always()
-        run: rm -f ~/.ssh/deploy_key
+        run: rm -f ~/.ssh/deploy_key ~/.ssh/config
 
   verify:
     name: Verify Deployment
@@ -110,7 +111,8 @@ jobs:
           mkdir -p ~/.ssh
           cp /opt/deploy_key ~/.ssh/deploy_key
           chmod 600 ~/.ssh/deploy_key
-          ssh-keyscan -H "${{ secrets.TARGET_HOST }}" >> ~/.ssh/known_hosts 2>/dev/null
+          echo "StrictHostKeyChecking no" > ~/.ssh/config
+          chmod 600 ~/.ssh/config
 
       - name: Run verification
         env:
@@ -120,4 +122,4 @@ jobs:
 
       - name: Cleanup SSH
         if: always()
-        run: rm -f ~/.ssh/deploy_key
+        run: rm -f ~/.ssh/deploy_key ~/.ssh/config
