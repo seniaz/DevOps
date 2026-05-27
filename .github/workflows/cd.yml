@@ -59,29 +59,11 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Set up SSH
-        run: |
-          # Створюємо папку і ЖОРСТКО фіксуємо права (без цього SSH мовчки відхиляє ключі)
-          mkdir -p ~/.ssh
-          chmod 700 ~/.ssh
-
-          # Беремо ключ напряму з GitHub Secrets, ігноруючи файли на комп'ютері
-          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/deploy_key
-          chmod 600 ~/.ssh/deploy_key
-
-          # Прописуємо залізні правила для підключення
-          echo "Host 192.168.56.107" > ~/.ssh/config
-          echo "  StrictHostKeyChecking no" >> ~/.ssh/config
-          echo "  User ansible" >> ~/.ssh/config
-          echo "  IdentityFile ~/.ssh/deploy_key" >> ~/.ssh/config
-          chmod 600 ~/.ssh/config
-
       - name: Deploy application
         env:
           IMAGE: ${{ env.REGISTRY }}/${{ github.repository }}:stable
         run: |
-          # Тепер SSH сам знає і користувача, і ключ із файлу config
-          ssh 192.168.56.107 << EOF
+          ssh -i /opt/deploy_key -o StrictHostKeyChecking=no ansible@192.168.56.107 << EOF
             set -euo pipefail
             sudo docker pull $IMAGE
             sudo systemctl stop mywebapp-container.service || true
@@ -100,10 +82,6 @@ jobs:
             done
           EOF
 
-      - name: Cleanup SSH
-        if: always()
-        run: rm -rf ~/.ssh
-
   verify:
     name: Verify Deployment
     runs-on: self-hosted
@@ -114,24 +92,11 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Set up SSH
-        run: |
-          mkdir -p ~/.ssh
-          chmod 700 ~/.ssh
-          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/deploy_key
-          chmod 600 ~/.ssh/deploy_key
-          echo "Host 192.168.56.107" > ~/.ssh/config
-          echo "  StrictHostKeyChecking no" >> ~/.ssh/config
-          echo "  User ansible" >> ~/.ssh/config
-          echo "  IdentityFile ~/.ssh/deploy_key" >> ~/.ssh/config
-          chmod 600 ~/.ssh/config
-
       - name: Run verification
         env:
           TARGET_HOST: 192.168.56.107
           TARGET_USER: ansible
-        run: bash scripts/verify.sh
-
-      - name: Cleanup SSH
-        if: always()
-        run: rm -rf ~/.ssh
+          KEY: /opt/deploy_key
+        run: |
+          # Передаємо змінні у скрипт verify.sh так само через абсолютний шлях
+          bash scripts/verify.sh
