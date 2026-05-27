@@ -62,29 +62,31 @@ jobs:
       - name: Deploy application
         env:
           IMAGE: ${{ env.REGISTRY }}/${{ github.repository }}:stable
+          DB_PASS: ${{ secrets.DB_PASSWORD }}
         run: |
           IMAGE_LOWER=$(echo "$IMAGE" | tr '[:upper:]' '[:lower:]')
-          ssh -i /opt/deploy_key -o StrictHostKeyChecking=no ansible@192.168.56.107 << EOF
-            set -euo pipefail
-            sudo docker pull $IMAGE_LOWER
-            sudo systemctl stop mywebapp-container.service || true
-            sudo docker run --rm --network host \
-              $IMAGE_LOWER \
-              python migrate.py \
-                --db-host 127.0.0.1 --db-port 3306 \
-                --db-user mywebapp --db-password "${{ secrets.DB_PASSWORD }}" \
-                --db-name mywebapp
-            sudo systemctl start mywebapp-container.service
-            for i in \$(seq 1 30); do
-              if curl -sf http://localhost:5000/health/alive > /dev/null 2>&1; then
-                echo "Service is UP!"
-                exit 0
-              fi
-              sleep 2
-            done
-            echo "Service FAILED to start"
-            exit 1
-          EOF
+          ssh -i /opt/deploy_key -o StrictHostKeyChecking=no ansible@192.168.56.107 bash -s "$IMAGE_LOWER" "$DB_PASS" << 'SCRIPT'
+          IMG="$1"
+          DBPW="$2"
+          echo "=== Pulling new image ==="
+          sudo docker pull "$IMG"
+          echo "=== Stopping current container ==="
+          sudo systemctl stop mywebapp-container.service || true
+          echo "=== Running migration ==="
+          sudo docker run --rm --network host "$IMG" python migrate.py --db-host 127.0.0.1 --db-port 3306 --db-user mywebapp --db-password "$DBPW" --db-name mywebapp
+          echo "=== Starting new container ==="
+          sudo systemctl start mywebapp-container.service
+          echo "=== Waiting for service ==="
+          for i in $(seq 1 30); do
+            if curl -sf http://localhost:5000/health/alive > /dev/null 2>&1; then
+              echo "Service is UP!"
+              exit 0
+            fi
+            sleep 2
+          done
+          echo "Service FAILED to start"
+          exit 1
+          SCRIPT
 
   verify:
     name: Verify Deployment
@@ -100,4 +102,5 @@ jobs:
         env:
           TARGET_HOST: 192.168.56.107
           TARGET_USER: ansible
+          KEY: /opt/deploy_key
         run: bash scripts/verify.sh
