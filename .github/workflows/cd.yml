@@ -77,106 +77,12 @@ jobs:
             sudo systemctl start mywebapp-container.service
             for i in \$(seq 1 30); do
               if curl -sf http://localhost:5000/health/alive > /dev/null 2>&1; then
-                break
-              fi
-              sleep 2
-            done
-          EOF
-
-  verify:
-    name: Verify Deployment
-    runs-on: self-hosted
-    needs: [deploy]
-    if: startsWith(github.ref, 'refs/tags/')
-name: CD
-
-on:
-  push:
-    branches: [main]
-    tags:
-      - "v*"
-
-env:
-  REGISTRY: ghcr.io
-  IMAGE_NAME: ${{ github.repository }}
-
-jobs:
-  build:
-    name: Build & Push Image
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      packages: write
-
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Log in to GHCR
-        uses: docker/login-action@v3
-        with:
-          registry: ${{ env.REGISTRY }}
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Extract metadata
-        id: meta
-        uses: docker/metadata-action@v5
-        with:
-          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
-          tags: |
-            type=raw,value=latest,enable=${{ github.ref == 'refs/heads/main' }}
-            type=sha,format=long,enable=${{ github.ref == 'refs/heads/main' }}
-            type=raw,value=stable,enable=${{ startsWith(github.ref, 'refs/tags/') }}
-            type=ref,event=tag
-
-      - name: Build and push Docker image
-        uses: docker/build-push-action@v5
-        with:
-          context: ./app
-          file: ./app/Dockerfile
-          push: true
-          tags: ${{ steps.meta.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
-
-  deploy:
-    name: Deploy to Target Node
-    runs-on: self-hosted
-    needs: [build]
-    if: startsWith(github.ref, 'refs/tags/')
-
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Deploy application
-        env:
-          IMAGE: ${{ env.REGISTRY }}/${{ github.repository }}:stable
-        run: |
-          IMAGE_LOWER=$(echo "$IMAGE" | tr '[:upper:]' '[:lower:]')
-          ssh -i /opt/deploy_key -o StrictHostKeyChecking=no ansible@192.168.56.107 << EOF
-            set -euo pipefail
-            sudo docker pull $IMAGE_LOWER
-            sudo systemctl stop mywebapp-container.service || true
-            sudo docker run --rm --network host \
-              $IMAGE_LOWER \
-              python migrate.py \
-                --db-host 127.0.0.1 --db-port 3306 \
-                --db-user mywebapp --db-password "${{ secrets.DB_PASSWORD }}" \
-                --db-name mywebapp
-            sudo systemctl start mywebapp-container.service
-            
-            echo "Waiting for service to start..."
-            for i in \$(seq 1 10); do
-              sleep 5
-              if curl -sf http://localhost:5000/health/alive > /dev/null 2>&1; then
                 echo "Service is UP!"
                 exit 0
               fi
-              echo "Attempt \$i: Still waiting... Container status:"
-              sudo docker ps | grep mywebapp || echo "Container is NOT running"
+              sleep 2
             done
-            echo "Service FAILED to start after 50 seconds"
+            echo "Service FAILED to start"
             exit 1
           EOF
 
@@ -186,15 +92,6 @@ jobs:
     needs: [deploy]
     if: startsWith(github.ref, 'refs/tags/')
 
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Run verification
-        env:
-          TARGET_HOST: 192.168.56.107
-          TARGET_USER: ansible
-        run: bash scripts/verify.sh
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
