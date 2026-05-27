@@ -1,0 +1,13 @@
+gradebook_number: 14
+
+teacher_password: "12345678"
+operator_password: "12345678"
+
+app_name: mywebapp
+app_port: 5000
+app_user: app
+
+db_name: mywebapp
+db_user: mywebapp
+db_password: "{{ vault_db_password | default('MyWebApp_Secure_Pass_2024!') }}"
+db_port: 3306
