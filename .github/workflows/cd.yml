@@ -69,7 +69,7 @@ jobs:
 
       - name: Deploy application
         env:
-          TARGET: ${{ secrets.TARGET_USER }}@${{ secrets.TARGET_HOST }}
+          TARGET: ansible@192.168.56.107
           KEY: ~/.ssh/deploy_key
           IMAGE: ${{ env.REGISTRY }}/${{ github.repository }}:stable
         run: |
@@ -116,8 +116,8 @@ jobs:
 
       - name: Run verification
         env:
-          TARGET_HOST: ${{ secrets.TARGET_HOST }}
-          TARGET_USER: ${{ secrets.TARGET_USER }}
+          TARGET_HOST: 192.168.56.107
+          TARGET_USER: ansible
         run: bash scripts/verify.sh
 
       - name: Cleanup SSH
