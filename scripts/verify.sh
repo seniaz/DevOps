@@ -1,9 +1,8 @@
 #!/usr/bin/env bash
-set -euo pipefail
 
 HOST="${TARGET_HOST:?TARGET_HOST not set}"
 USER="${TARGET_USER:-ansible}"
-KEY="/opt/deploy_key"
+KEY="${KEY:-/opt/deploy_key}"
 PASS=0
 FAIL=0
 
@@ -16,10 +15,10 @@ check() {
     shift
     if "$@" > /dev/null 2>&1; then
         echo "  [PASS] $name"
-        ((PASS++))
+        PASS=$((PASS + 1))
     else
         echo "  [FAIL] $name"
-        ((FAIL++))
+        FAIL=$((FAIL + 1))
     fi
 }
 
@@ -59,4 +58,5 @@ if [ "$FAIL" -gt 0 ]; then
     exit 1
 else
     echo "ALL CHECKS PASSED"
+    exit 0
 fi
