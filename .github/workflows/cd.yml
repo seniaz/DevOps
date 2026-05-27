@@ -8,6 +8,7 @@ on:
 
 env:
   REGISTRY: ghcr.io
+  # Використовуємо нижній регістр відразу для уникнення помилок Docker
   IMAGE_NAME: ${{ github.repository }}
 
 jobs:
@@ -60,15 +61,16 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Deploy application
-        env:
-          IMAGE: ${{ env.REGISTRY }}/${{ github.repository }}:stable
         run: |
+          # Перетворюємо назву образу в нижній регістр для Docker
+          IMAGE_LOWER=$(echo "${{ env.REGISTRY }}/${{ github.repository }}" | tr '[:upper:]' '[:lower:]'):stable
+
           ssh -i /opt/deploy_key -o StrictHostKeyChecking=no ansible@192.168.56.107 << EOF
             set -euo pipefail
-            sudo docker pull $IMAGE
+            sudo docker pull $IMAGE_LOWER
             sudo systemctl stop mywebapp-container.service || true
             sudo docker run --rm --network host \
-              $IMAGE \
+              $IMAGE_LOWER \
               python migrate.py \
                 --db-host 127.0.0.1 --db-port 3306 \
                 --db-user mywebapp --db-password "${{ secrets.DB_PASSWORD }}" \
@@ -93,10 +95,5 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Run verification
-        env:
-          TARGET_HOST: 192.168.56.107
-          TARGET_USER: ansible
-          KEY: /opt/deploy_key
         run: |
-          # Передаємо змінні у скрипт verify.sh так само через абсолютний шлях
           bash scripts/verify.sh
