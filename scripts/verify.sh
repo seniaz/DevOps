@@ -3,12 +3,12 @@ set -euo pipefail
 
 HOST="${TARGET_HOST:?TARGET_HOST not set}"
 USER="${TARGET_USER:-ansible}"
-KEY="$HOME/.ssh/deploy_key"
+KEY="/opt/deploy_key"
 PASS=0
 FAIL=0
 
 run_on_target() {
-    ssh -i "$KEY" "${USER}@${HOST}" "$@"
+    ssh -i "$KEY" -o StrictHostKeyChecking=no "${USER}@${HOST}" "$@"
 }
 
 check() {
@@ -36,7 +36,7 @@ echo "-- Nginx Configuration --"
 check "Nginx is running" run_on_target "systemctl is-active nginx"
 check "Root endpoint via nginx (port 80)" run_on_target "curl -sf http://localhost:80/"
 check "GET /items via nginx" run_on_target "curl -sf -H 'Accept: application/json' http://localhost:80/items"
-check "Health endpoints blocked by nginx" run_on_target "curl -sf -o /dev/null -w '%{http_code}' http://localhost:80/health/alive | grep -qv 200"
+check "Health endpoints blocked by nginx" run_on_target "! curl -sf http://localhost:80/health/alive"
 
 echo ""
 echo "-- Container Status --"
