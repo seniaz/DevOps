@@ -1,0 +1,20 @@
+name: SSH Debug
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  debug_environment:
+    runs-on: self-hosted
+    steps:
+      - name: Who am I?
+        run: |
+          echo "CURRENT USER:"
+          whoami
+          echo "PERMISSIONS FOR OPT:"
+          ls -la /opt/deploy_key || echo "CANNOT SEE FILE"
+
+      - name: Test Pure SSH Connection
+        run: |
+          ssh -v -i /opt/deploy_key -o StrictHostKeyChecking=no ansible@192.168.56.107 "echo ACTION_SSH_WORKS"
