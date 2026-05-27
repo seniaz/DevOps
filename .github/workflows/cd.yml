@@ -8,7 +8,6 @@ on:
 
 env:
   REGISTRY: ghcr.io
-  # Використовуємо нижній регістр відразу для уникнення помилок Docker
   IMAGE_NAME: ${{ github.repository }}
 
 jobs:
@@ -61,10 +60,10 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Deploy application
+        env:
+          IMAGE: ${{ env.REGISTRY }}/${{ github.repository }}:stable
         run: |
-          # Перетворюємо назву образу в нижній регістр для Docker
-          IMAGE_LOWER=$(echo "${{ env.REGISTRY }}/${{ github.repository }}" | tr '[:upper:]' '[:lower:]'):stable
-
+          IMAGE_LOWER=$(echo "$IMAGE" | tr '[:upper:]' '[:lower:]')
           ssh -i /opt/deploy_key -o StrictHostKeyChecking=no ansible@192.168.56.107 << EOF
             set -euo pipefail
             sudo docker pull $IMAGE_LOWER
@@ -95,5 +94,7 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Run verification
-        run: |
-          bash scripts/verify.sh
+        env:
+          TARGET_HOST: 192.168.56.107
+          TARGET_USER: ansible
+        run: bash scripts/verify.sh
