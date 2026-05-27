@@ -1,0 +1,56 @@
+---
+- name: Install MariaDB server
+  ansible.builtin.apt:
+    name:
+      - mariadb-server
+      - python3-mysqldb
+    state: present
+
+- name: Configure MariaDB bind-address
+  ansible.builtin.template:
+    src: 60-bind.cnf.j2
+    dest: /etc/mysql/mariadb.conf.d/60-bind.cnf
+    owner: root
+    group: root
+    mode: "0644"
+  notify: Restart MariaDB
+
+- name: Ensure MariaDB is started and enabled
+  ansible.builtin.systemd:
+    name: mariadb
+    state: started
+    enabled: true
+
+- name: Create application database
+  community.mysql.mysql_db:
+    name: "{{ db_name }}"
+    state: present
+    login_unix_socket: /run/mysqld/mysqld.sock
+
+- name: Create application database user
+  community.mysql.mysql_user:
+    name: "{{ db_user }}"
+    password: "{{ db_password }}"
+    host: "%"
+    priv: "{{ db_name }}.*:ALL"
+    state: present
+    login_unix_socket: /run/mysqld/mysqld.sock
+
+- name: Configure UFW — allow MariaDB only from worker
+  community.general.ufw:
+    rule: allow
+    port: "{{ db_port }}"
+    proto: tcp
+    src: "{{ hostvars['worker']['ansible_host'] }}"
+
+- name: Configure UFW — allow SSH
+  community.general.ufw:
+    rule: allow
+    port: "22"
+    proto: tcp
+
+- name: Enable UFW with default deny
+  community.general.ufw:
+    state: enabled
+    default: deny
+    direction: incoming
