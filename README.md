@@ -21,3 +21,25 @@
 | `V2 = (N%2)+1` | **1**    | конфігурація через **аргументи командного рядка**, БД — **MariaDB** |
 | `V3 = (N%3)+1` | **3**    | застосунок — **Simple Inventory** (облік обладнання)                |
 | `V5 = (N%5)+1` | **5**    | порт застосунку — **5000**                                          |
+
+## Лабораторна робота №3 — CI/CD
+
+### CI Pipeline
+
+Запускається автоматично на push в `main`, annotated tags та Pull Requests.
+
+**Jobs:**
+
+- **Code Analysis** — flake8, hadolint, shellcheck, yamllint
+- **Tests** — pytest + coverage (мінімум 40%)
+
+### CD Pipeline
+
+Запускається на push в `main` (build) та annotated tags (build + deploy + verify).
+
+**Docker образ:** `ghcr.io/<username>/devops`
+
+**Тегування:**
+
+- push в main: `latest`, `sha-<hash>`
+- annotated tag: `stable`, `<tag>`
